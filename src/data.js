@@ -1,4 +1,4 @@
-export const PRODUCTS_DATA = [
+export const INITIAL_PRODUCTS = [
     {
         id: '1',
         name: 'Yerba Mate 1kg',
