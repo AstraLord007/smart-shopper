@@ -417,8 +417,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   toggleFormButton: {
-    backgroundColor: '#7c3aed', // Cambia este color (ej. Morado moderno)
-    paddingVertical: 12,
+    backgroundColor: '#7c3aed',
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 20,
