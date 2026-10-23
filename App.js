@@ -15,18 +15,19 @@ export default function App() {
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [search, setSearch] = useState('');
 
-  // Estados para el formulario
+  // Estados para el formulario de productos
   const [newName, setNewName] = useState('');
   const [newCategory, setNewCategory] = useState('');
   const [priceMaria, setPriceMaria] = useState('');
   const [priceNorte, setPriceNorte] = useState('');
   const [priceJose, setPriceJose] = useState('');
   const [editingId, setEditingId] = useState(null);
-
-  // Estado para mostrar u ocultar el formulario (evita que tape la pantalla)
   const [showForm, setShowForm] = useState(false);
 
-  // Función para Guardar (Crear o Actualizar)
+  // Estado para la Canasta de Compras (IDs de los productos seleccionados)
+  const [cartIds, setCartIds] = useState([]);
+
+  // Funcionalidad de Guardar (Crear / Actualizar)
   const handleSaveProduct = () => {
     if (!newName || !priceMaria || !priceNorte || !priceJose) {
       alert('Por favor complete el nombre y los precios para los tres comercios.');
@@ -65,7 +66,7 @@ export default function App() {
     }
 
     clearForm();
-    setShowForm(false); // Cierra el formulario al guardar
+    setShowForm(false);
   };
 
   const handleStartEdit = (item) => {
@@ -75,11 +76,12 @@ export default function App() {
     setPriceMaria(item.stores.find((s) => s.id === 's1')?.price.toString() || '');
     setPriceNorte(item.stores.find((s) => s.id === 's2')?.price.toString() || '');
     setPriceJose(item.stores.find((s) => s.id === 's3')?.price.toString() || '');
-    setShowForm(true); // Abre el formulario automáticamente al editar
+    setShowForm(true);
   };
 
   const handleDeleteProduct = (id) => {
     setProducts(products.filter((item) => item.id !== id));
+    setCartIds(cartIds.filter((cartId) => cartId !== id)); // Remover de la canasta si se borra
     if (editingId === id) {
       clearForm();
     }
@@ -94,6 +96,38 @@ export default function App() {
     setEditingId(null);
   };
 
+  // Manejar selección de productos para la Canasta
+  const toggleCartItem = (id) => {
+    if (cartIds.includes(id)) {
+      setCartIds(cartIds.filter((item) => item !== id));
+    } else {
+      setCartIds([...cartIds, id]);
+    }
+  };
+
+  // Cálculo de totales de la canasta por comercio
+  const storesSummary = [
+    { id: 's1', name: 'Despensa María', total: 0 },
+    { id: 's2', name: 'Supermercado Norte', total: 0 },
+    { id: 's3', name: 'Almacén Don José', total: 0 },
+  ];
+
+  cartIds.forEach((cartId) => {
+    const product = products.find((p) => p.id === cartId);
+    if (product) {
+      product.stores.forEach((store) => {
+        const storeSum = storesSummary.find((s) => s.id === store.id);
+        if (storeSum) {
+          storeSum.total += store.price;
+        }
+      });
+    }
+  });
+
+  // Encontrar el total más barato para la canasta completa
+  const validTotals = storesSummary.map((s) => s.total).filter((t) => t > 0);
+  const minCartTotal = validTotals.length > 0 ? Math.min(...validTotals) : 0;
+
   const filteredProducts = products.filter((item) =>
     item.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -106,7 +140,36 @@ export default function App() {
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
         {/* Título */}
         <Text style={styles.headerTitle}>🛒 Smart Shopper</Text>
-        <Text style={styles.subtitle}>Comparador de precios de barrio</Text>
+        <Text style={styles.subtitle}>Comparador de precios y Canasta inteligente</Text>
+
+        {/* Sección de Canasta / Resumen de Compra Completa */}
+        {cartIds.length > 0 && (
+          <View style={styles.cartSummaryContainer}>
+            <Text style={styles.cartSummaryTitle}>🛍️ Resumen de tu Canasta ({cartIds.length} ítems)</Text>
+            {storesSummary.map((store) => {
+              const isBestStore = store.total === minCartTotal && store.total > 0;
+              return (
+                <View
+                  key={store.id}
+                  style={[styles.cartStoreRow, isBestStore && styles.bestCartStoreRow]}
+                >
+                  <Text style={[styles.cartStoreName, isBestStore && styles.bestCartText]}>
+                    {store.name}
+                  </Text>
+                  <Text style={[styles.cartStoreTotal, isBestStore && styles.bestCartText]}>
+                    ${store.total.toLocaleString()} {isBestStore && '🏆 ¡Más económico!'}
+                  </Text>
+                </View>
+              );
+            })}
+            <TouchableOpacity
+              style={styles.clearCartButton}
+              onPress={() => setCartIds([])}
+            >
+              <Text style={styles.clearCartButtonText}>Vaciar Canasta</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Barra de Búsqueda */}
         <TextInput
@@ -130,7 +193,7 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
-        {/* Formulario Dinámico (Se muestra solo si showForm es true) */}
+        {/* Formulario Dinámico */}
         {showForm && (
           <View style={styles.formContainer}>
             <Text style={styles.formTitle}>
@@ -207,6 +270,7 @@ export default function App() {
         {filteredProducts.map((item) => {
           const prices = item.stores.map((s) => s.price);
           const minPrice = Math.min(...prices);
+          const isInCart = cartIds.includes(item.id);
 
           return (
             <View key={item.id} style={styles.card}>
@@ -216,8 +280,14 @@ export default function App() {
                   <Text style={styles.categoryBadgeText}>{item.category}</Text>
                 </View>
 
-                {/* Botones de Editar y Eliminar */}
+                {/* Botones de Acción (Canasta, Editar, Eliminar) */}
                 <View style={styles.cardActions}>
+                  <TouchableOpacity
+                    style={[styles.cartActionBtn, isInCart && styles.cartActionBtnActive]}
+                    onPress={() => toggleCartItem(item.id)}
+                  >
+                    <Text style={styles.actionBtnText}>{isInCart ? '🛒✅' : '🛒➕'}</Text>
+                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.editActionBtn}
                     onPress={() => handleStartEdit(item)}
@@ -282,6 +352,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
+  cartSummaryContainer: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 20,
+    elevation: 3,
+  },
+  cartSummaryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e40af',
+    marginBottom: 10,
+  },
+  cartStoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  bestCartStoreRow: {
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  cartStoreName: {
+    fontSize: 14,
+    color: '#334155',
+    fontWeight: '600',
+  },
+  cartStoreTotal: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#334155',
+  },
+  bestCartText: {
+    color: '#15803d',
+    fontWeight: 'bold',
+  },
+  clearCartButton: {
+    marginTop: 8,
+    backgroundColor: '#ef4444',
+    paddingVertical: 6,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  clearCartButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   inputSearch: {
     backgroundColor: '#fff',
     paddingHorizontal: 15,
@@ -293,7 +417,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   toggleFormButton: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#7c3aed', // Cambia este color (ej. Morado moderno)
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -398,7 +522,17 @@ const styles = StyleSheet.create({
   },
   cardActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
+  },
+  cartActionBtn: {
+    backgroundColor: '#e0f2fe',
+    padding: 8,
+    borderRadius: 6,
+  },
+  cartActionBtnActive: {
+    backgroundColor: '#bae6fd',
+    borderWidth: 1,
+    borderColor: '#0284c7',
   },
   editActionBtn: {
     backgroundColor: '#fef08a',
